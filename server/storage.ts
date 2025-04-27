@@ -1,8 +1,20 @@
-import { users, type User, type InsertUser, type Scan, type InsertScan, type Product, type InsertProduct } from "@shared/schema";
-import session from "express-session";
-import createMemoryStore from "memorystore";
+import { 
+  users, 
+  scans, 
+  products, 
+  type User, 
+  type InsertUser, 
+  type Scan, 
+  type InsertScan, 
+  type Product, 
+  type InsertProduct 
+} from "@shared/schema";
+import * as expressSession from "express-session";
+import connectPg from "connect-pg-simple";
+import { db, pool } from "./db";
+import { eq } from "drizzle-orm";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresStore = connectPg(expressSession);
 
 export interface IStorage {
   // User methods
@@ -21,88 +33,105 @@ export interface IStorage {
   getProductsByBusinessId(businessId: number): Promise<Product[]>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: expressSession.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private scans: Map<number, Scan>;
-  private products: Map<number, Product>;
-  public sessionStore: session.SessionStore;
-  
-  private userIdCounter: number;
-  private scanIdCounter: number;
-  private productIdCounter: number;
+export class DatabaseStorage implements IStorage {
+  public sessionStore: expressSession.Store;
 
   constructor() {
-    this.users = new Map();
-    this.scans = new Map();
-    this.products = new Map();
-    this.userIdCounter = 1;
-    this.scanIdCounter = 1;
-    this.productIdCounter = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
+    this.sessionStore = new PostgresStore({
+      pool,
+      createTableIfMissing: true,
     });
   }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userIdCounter++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values({
+        username: insertUser.username,
+        password: insertUser.password,
+        email: insertUser.email,
+        userType: insertUser.userType
+      })
+      .returning();
     return user;
   }
 
   // Scan methods
   async createScan(insertScan: InsertScan): Promise<Scan> {
-    const id = this.scanIdCounter++;
-    const scanDate = new Date();
-    const scan: Scan = { ...insertScan, id, scanDate };
-    this.scans.set(id, scan);
+    const [scan] = await db
+      .insert(scans)
+      .values({
+        userId: insertScan.userId,
+        productName: insertScan.productName || null,
+        imagePath: insertScan.imagePath || null,
+        scanType: insertScan.scanType,
+        trustScore: insertScan.trustScore || null,
+        isAuthentic: insertScan.isAuthentic || null,
+        logoScore: insertScan.logoScore || null,
+        textureScore: insertScan.textureScore || null,
+        barcodeScore: insertScan.barcodeScore || null,
+        blockchainVerified: insertScan.blockchainVerified || false,
+        blockchainHash: insertScan.blockchainHash || null
+      })
+      .returning();
     return scan;
   }
 
   async getScansByUserId(userId: number): Promise<Scan[]> {
-    return Array.from(this.scans.values()).filter(
-      (scan) => scan.userId === userId,
-    ).sort((a, b) => b.scanDate.getTime() - a.scanDate.getTime());
+    return db
+      .select()
+      .from(scans)
+      .where(eq(scans.userId, userId))
+      .orderBy(scans.scanDate);
   }
 
   async getScan(id: number): Promise<Scan | undefined> {
-    return this.scans.get(id);
+    const [scan] = await db.select().from(scans).where(eq(scans.id, id));
+    return scan || undefined;
   }
 
   // Product methods
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const id = this.productIdCounter++;
-    const registrationDate = new Date();
-    const product: Product = { ...insertProduct, id, registrationDate };
-    this.products.set(id, product);
+    const [product] = await db
+      .insert(products)
+      .values({
+        businessId: insertProduct.businessId,
+        name: insertProduct.name,
+        description: insertProduct.description || null,
+        blockchainHash: insertProduct.blockchainHash || null
+      })
+      .returning();
     return product;
   }
 
   async getProductByHash(blockchainHash: string): Promise<Product | undefined> {
-    return Array.from(this.products.values()).find(
-      (product) => product.blockchainHash === blockchainHash,
-    );
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(eq(products.blockchainHash, blockchainHash));
+    return product || undefined;
   }
 
   async getProductsByBusinessId(businessId: number): Promise<Product[]> {
-    return Array.from(this.products.values()).filter(
-      (product) => product.businessId === businessId,
-    );
+    return db
+      .select()
+      .from(products)
+      .where(eq(products.businessId, businessId));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

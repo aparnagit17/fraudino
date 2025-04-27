@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -12,7 +13,7 @@ export const users = pgTable("users", {
 
 export const scans = pgTable("scans", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id),
   productName: text("product_name"),
   imagePath: text("image_path"),
   scanType: text("scan_type").notNull(), // 'image', 'qr', 'nfc', 'rfid'
@@ -28,7 +29,7 @@ export const scans = pgTable("scans", {
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
-  businessId: integer("business_id").notNull(),
+  businessId: integer("business_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
   blockchainHash: text("blockchain_hash"),
@@ -82,3 +83,23 @@ export const loginSchema = z.object({
 });
 
 export type LoginData = z.infer<typeof loginSchema>;
+
+// Table relations
+export const usersRelations = relations(users, ({ many }) => ({
+  scans: many(scans),
+  products: many(products),
+}));
+
+export const scansRelations = relations(scans, ({ one }) => ({
+  user: one(users, {
+    fields: [scans.userId],
+    references: [users.id],
+  }),
+}));
+
+export const productsRelations = relations(products, ({ one }) => ({
+  business: one(users, {
+    fields: [products.businessId],
+    references: [users.id],
+  }),
+}));

@@ -9,12 +9,13 @@ import {
   type Product, 
   type InsertProduct 
 } from "@shared/schema";
-import * as expressSession from "express-session";
-import connectPg from "connect-pg-simple";
+import expressSession from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { db, pool } from "./db";
 import { eq } from "drizzle-orm";
 
-const PostgresStore = connectPg(expressSession);
+// Create session store with express-session
+const PostgresStore = connectPgSimple(expressSession);
 
 export interface IStorage {
   // User methods

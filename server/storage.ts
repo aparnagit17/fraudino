@@ -126,6 +126,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.blockchainHash, blockchainHash));
     return product || undefined;
   }
+  
+  // Check if this hash has been scanned before by other users
+  async getScansWithHash(blockchainHash: string): Promise<Scan[]> {
+    return db
+      .select()
+      .from(scans)
+      .where(eq(scans.blockchainHash, blockchainHash))
+      .orderBy(scans.scanDate);
+  }
 
   async getProductsByBusinessId(businessId: number): Promise<Product[]> {
     return db

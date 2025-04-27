@@ -1,5 +1,5 @@
 // Simulated AI model for counterfeit detection
-import * as tf from 'tensorflow.js';
+// Note: In a real implementation, we would use TensorFlow.js, but for this MVP we're simulating the AI functionality
 
 interface AnalysisResult {
   trustScore: number;
@@ -9,6 +9,8 @@ interface AnalysisResult {
   barcodeScore: number;
   confidenceLevel: number;
   detectionDetails: string[];
+  // New field to indicate duplicate detection
+  potentialDuplicate?: boolean;
 }
 
 // This is a simulated AI model for counterfeit detection
@@ -35,7 +37,10 @@ export class CounterfeitDetectionAI {
     }
   }
 
-  async analyzeImage(imageBuffer: Buffer): Promise<AnalysisResult> {
+  async analyzeImage(
+    imageBuffer: Buffer, 
+    isDuplicate: boolean = false
+  ): Promise<AnalysisResult> {
     await this.initialize();
     
     // Since we're not using a real model for this MVP, we'll simulate analysis
@@ -45,13 +50,20 @@ export class CounterfeitDetectionAI {
     // 3. Post-process the results
     
     // For demonstration purposes, we'll simulate various product features analysis
-    const logoScore = Math.floor(Math.random() * 30) + 70; // 70-100
-    const textureScore = Math.floor(Math.random() * 30) + 70; // 70-100
-    const barcodeScore = Math.floor(Math.random() * 30) + 70; // 70-100
+    let logoScore = Math.floor(Math.random() * 30) + 70; // 70-100
+    let textureScore = Math.floor(Math.random() * 30) + 70; // 70-100
+    let barcodeScore = Math.floor(Math.random() * 30) + 70; // 70-100
+    
+    // If this is a potential duplicate, reduce the scores
+    if (isDuplicate) {
+      logoScore = Math.max(20, logoScore - 30);
+      textureScore = Math.max(30, textureScore - 25);
+      barcodeScore = Math.max(10, barcodeScore - 40);
+    }
     
     // Calculate overall trust score
     const trustScore = Math.floor((logoScore + textureScore + barcodeScore) / 3);
-    const isAuthentic = trustScore >= 80;
+    const isAuthentic = trustScore >= 80 && !isDuplicate;
     
     // Generate some detection details
     const detectionDetails = [
@@ -60,6 +72,12 @@ export class CounterfeitDetectionAI {
       `Barcode/QR validation: ${this.getAnalysisComment(barcodeScore)}`,
     ];
     
+    // Add warning for potential duplicates
+    if (isDuplicate) {
+      detectionDetails.push("⚠️ WARNING: Product hash matches a previously scanned item");
+      detectionDetails.push("⚠️ This may indicate a counterfeit or unauthorized replica");
+    }
+    
     return {
       trustScore,
       isAuthentic,
@@ -67,7 +85,8 @@ export class CounterfeitDetectionAI {
       textureScore,
       barcodeScore,
       confidenceLevel: Math.min(logoScore, textureScore, barcodeScore) / 100,
-      detectionDetails
+      detectionDetails,
+      potentialDuplicate: isDuplicate
     };
   }
 

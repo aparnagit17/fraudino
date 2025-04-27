@@ -87,8 +87,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productName: req.body.productName || (product ? product.name : "Unknown Product"),
         imagePath: req.file.filename,
         scanType: "image",
-        trustScore: trustScore,
-        isAuthentic: isAuthentic,
+        trustScore: analysisResult.trustScore,
+        isAuthentic: analysisResult.isAuthentic,
         logoScore: analysisResult.logoScore,
         textureScore: analysisResult.textureScore,
         barcodeScore: analysisResult.barcodeScore,
@@ -99,11 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return the scan result with duplicate information
       res.status(200).json({
         scan,
-        analysis: {
-          ...analysisResult,
-          trustScore: trustScore,
-          isAuthentic: isAuthentic
-        },
+        analysis: analysisResult,
         isDuplicate: isDuplicate,
         product: product
       });
